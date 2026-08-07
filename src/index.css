@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Inter:wght@400;500&family=Poppins:wght@600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Poppins', sans-serif;
+  --font-logo: 'Cinzel', serif;
+  
+  --color-primary: #0D4846;
+  --color-primary-hover: #11615D;
+  --color-primary-active: #062E2D;
+  --color-secondary: #0D4846;
+  --color-success: #2F8F89;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-app-bg: #F7FAF9;
+  --color-surface-card: #FFFFFF;
+  --color-border-custom: #D8E7E5;
+  --color-text-primary: #082F2D;
+  --color-text-secondary: #3F5E5C;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-app-bg);
+  color: var(--color-text-primary);
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom shadows */
+.shadow-premium-card {
+  box-shadow: 0 12px 40px rgba(13, 72, 70, 0.08);
+}
+
+.shadow-premium-btn {
+  box-shadow: 0 10px 25px rgba(13, 72, 70, 0.20);
+}
+
+/* Shine Animation */
+@keyframes shine-sweep {
+  0% {
+    left: -120%;
+  }
+  10%, 100% {
+    left: 220%;
+  }
+}
+
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 60px;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: skewX(-20deg);
+  animation: shine-sweep 5.5s infinite ease-in-out;
+}
+
+/* Floating Card Animation */
+@keyframes float-auth-card {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float-card {
+  animation: float-auth-card 4s ease-in-out infinite alternate;
+}
+
+
