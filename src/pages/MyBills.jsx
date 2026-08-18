@@ -14,11 +14,12 @@ const MyBills = () => {
 
   const [loading, setLoading] = useState(true);
   const [bills, setBills] = useState([]);
+  const [activeTab, setActiveTab] = useState('outstanding'); // 'outstanding' or 'paid'
   const [selectedBill, setSelectedBill] = useState(null);
   const [showMethodModal, setShowMethodModal] = useState(false);
   const [showSuccessScreen, setShowSuccessScreen] = useState(false);
   const [successDetails, setSuccessDetails] = useState(null);
-  
+
   const [toastMessage, setToastMessage] = useState(null);
   const [toastType, setToastType] = useState('info');
 
@@ -43,7 +44,9 @@ const MyBills = () => {
   };
 
   useEffect(() => {
-    fetchBills();
+    if (token) {
+      fetchBills();
+    }
   }, [token]);
 
   const loadRazorpaySDK = () => {
@@ -87,7 +90,7 @@ const MyBills = () => {
 
       // 2. Open Razorpay Widget
       const options = {
-        key: 'rzp_test_T0cRqCmnc2pb2H', // Live loaded key
+        key: 'rzp_test_T0cRqCmnc2pb2H',
         amount: amount,
         currency: currency,
         name: 'MEDSPACES',
@@ -107,18 +110,19 @@ const MyBills = () => {
               const updatedBill = {
                 ...selectedBill,
                 collected_flag: 'Yes',
-                payment_mode: 'UPI',
+                payment_mode: 'ONLINE',
+                payment_status: 'PAID',
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_order_id: response.razorpay_order_id
               };
 
               setSuccessDetails({
                 amount: selectedBill.amount,
-                receiptNo: `RCP-2025-${selectedBill.id.slice(0,4).toUpperCase()}-0019`,
+                receiptNo: `RCP-2026-${selectedBill.id.slice(0, 4).toUpperCase()}`,
                 transactionId: response.razorpay_payment_id,
                 bill: updatedBill
               });
-              
+
               setShowSuccessScreen(true);
               fetchBills();
             }
@@ -127,8 +131,8 @@ const MyBills = () => {
           }
         },
         prefill: {
-          name: user.name,
-          email: user.email
+          name: user?.name,
+          email: user?.email
         },
         theme: {
           color: '#0D4846'
@@ -137,7 +141,6 @@ const MyBills = () => {
 
       const paymentObject = new window.Razorpay(options);
       paymentObject.open();
-
     } catch (err) {
       triggerToast(err.error || 'Checkout initiation error', 'error');
     }
@@ -145,7 +148,9 @@ const MyBills = () => {
 
   const processCashPayment = async () => {
     setShowMethodModal(false);
-    const confirm = window.confirm("You chose to pay at the clinic. Proceed to request frontdesk verification?");
+    const confirm = window.confirm(
+      'You chose to pay at the clinic. Proceed to request frontdesk verification?'
+    );
     if (!confirm) return;
 
     try {
@@ -201,7 +206,7 @@ const MyBills = () => {
               </tr>
               <tr>
                 <td class="label">Invoice Reference</td>
-                <td class="value">${bill.razorpay_order_id || 'INV-2025-0043'}</td>
+                <td class="value">INV-${bill.id.slice(0, 8).toUpperCase()}</td>
               </tr>
               <tr>
                 <td class="label">Date</td>
@@ -209,15 +214,11 @@ const MyBills = () => {
               </tr>
               <tr>
                 <td class="label">Payment Method</td>
-                <td class="value">${bill.payment_mode || 'UPI / Online'}</td>
+                <td class="value">${bill.payment_mode || 'ONLINE'}</td>
               </tr>
               <tr>
                 <td class="label">Transaction Reference</td>
-                <td class="value">${bill.razorpay_payment_id || 'pay_N5T8d6y9f0k2t3m'}</td>
-              </tr>
-              <tr>
-                <td class="label">GST (Included)</td>
-                <td class="value">18% (₹${(parseFloat(bill.amount) * 0.18).toFixed(2)})</td>
+                <td class="value">${bill.transactionId || bill.razorpay_payment_id || 'Cash Verified'}</td>
               </tr>
             </table>
             <div class="total">
@@ -236,17 +237,24 @@ const MyBills = () => {
   };
 
   const getStatusBadge = (bill) => {
-    if (bill.collected_flag === 'Yes') {
+    if (bill.collected_flag === 'Yes' || bill.payment_status === 'PAID') {
       return (
         <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold rounded-full uppercase tracking-wider">
           Paid
         </span>
       );
     }
-    if (bill.payment_status === 'Awaiting Cash Payment') {
+    if (bill.payment_status === 'CASH_PAYMENT_PENDING' || bill.payment_status === 'CASH_PENDING') {
       return (
         <span className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-full uppercase tracking-wider">
           Awaiting Cash
+        </span>
+      );
+    }
+    if (bill.payment_status === 'PAYMENT_EXPIRED') {
+      return (
+        <span className="px-3 py-1 bg-red-50 text-red-700 border border-red-200 text-xs font-semibold rounded-full uppercase tracking-wider">
+          Expired
         </span>
       );
     }
@@ -257,6 +265,13 @@ const MyBills = () => {
     );
   };
 
+  const outstandingBills = bills.filter(b => b.collected_flag !== 'Yes' && b.payment_status !== 'PAYMENT_EXPIRED');
+  const paidBills = bills.filter(b => b.collected_flag === 'Yes');
+  // We can show expired bills under outstanding tab but without payment actions, or in active list
+  const displayedBills = activeTab === 'outstanding' 
+    ? bills.filter(b => b.collected_flag !== 'Yes') 
+    : paidBills;
+
   if (showSuccessScreen && successDetails) {
     return (
       <NavigationShell role="patient" userName={user?.name} onLogout={logout}>
@@ -266,28 +281,39 @@ const MyBills = () => {
           </div>
           <div>
             <h2 className="text-2xl font-bold font-heading text-[#082F2D]">Payment Successful!</h2>
-            <p className="font-sans text-sm text-text-secondary mt-1">Your payment of ₹{parseFloat(successDetails.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} was successful.</p>
+            <p className="font-sans text-sm text-text-secondary mt-1">
+              Your payment of ₹{parseFloat(successDetails.amount).toLocaleString('en-IN', {
+                minimumFractionDigits: 2
+              })}{' '}
+              was successful.
+            </p>
           </div>
 
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-left text-xs font-sans space-y-2 text-text-primary">
-            <p><span className="text-text-secondary font-medium">Receipt No:</span> <span className="font-semibold">{successDetails.receiptNo}</span></p>
-            <p><span className="text-text-secondary font-medium">Transaction ID:</span> <span className="font-semibold">{successDetails.transactionId}</span></p>
+            <p>
+              <span className="text-text-secondary font-medium">Receipt No:</span>{' '}
+              <span className="font-semibold">{successDetails.receiptNo}</span>
+            </p>
+            <p>
+              <span className="text-text-secondary font-medium">Transaction ID:</span>{' '}
+              <span className="font-semibold">{successDetails.transactionId}</span>
+            </p>
           </div>
 
           <div className="space-y-3 pt-2">
-            <button 
+            <button
               onClick={() => downloadReceipt(successDetails.bill)}
-              className="w-full text-white font-sans font-semibold text-xs py-3.5 rounded-2xl hover:scale-[1.02] active:scale-100 transition-all duration-200 flex items-center justify-center gap-1.5"
+              className="w-full text-white font-sans font-semibold text-xs py-3.5 rounded-2xl hover:scale-[1.02] active:scale-100 transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
               style={{ background: 'linear-gradient(135deg, #0D4846, #11615D)' }}
             >
               <Download size={14} /> Download Receipt
             </button>
-            <button 
+            <button
               onClick={() => {
                 setShowSuccessScreen(false);
                 setSuccessDetails(null);
               }}
-              className="w-full bg-transparent border border-[#D8E7E5] text-[#0D4846] font-sans font-semibold text-xs py-3.5 rounded-2xl hover:bg-slate-50 transition-all"
+              className="w-full bg-transparent border border-[#D8E7E5] text-[#0D4846] font-sans font-semibold text-xs py-3.5 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
             >
               Back to Bills
             </button>
@@ -302,7 +328,33 @@ const MyBills = () => {
       <div className="max-w-4xl mx-auto space-y-6 select-none">
         <div className="text-left">
           <h1 className="text-3xl font-bold font-heading text-secondary mb-2">My Bills & Invoices</h1>
-          <p className="font-sans text-sm text-text-secondary">View your billing history and process online payments securely.</p>
+          <p className="font-sans text-sm text-text-secondary">
+            View your billing history and process online payments securely.
+          </p>
+        </div>
+
+        {/* Tabs for Outstanding & Paid */}
+        <div className="flex border-b border-[#D8E7E5] font-sans">
+          <button
+            onClick={() => setActiveTab('outstanding')}
+            className={`py-3 px-6 font-bold text-sm border-b-2 transition-all cursor-pointer ${
+              activeTab === 'outstanding'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Outstanding
+          </button>
+          <button
+            onClick={() => setActiveTab('paid')}
+            className={`py-3 px-6 font-bold text-sm border-b-2 transition-all cursor-pointer ${
+              activeTab === 'paid'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Paid
+          </button>
         </div>
 
         {loading ? (
@@ -310,26 +362,59 @@ const MyBills = () => {
             <Skeleton variant="rect" height="100px" />
             <Skeleton variant="rect" height="100px" />
           </div>
-        ) : bills.length > 0 ? (
+        ) : displayedBills.length > 0 ? (
           <div className="space-y-4">
-            {bills.map((bill) => (
-              <div 
-                key={bill.id} 
+            {displayedBills.map((bill) => (
+              <div
+                key={bill.id}
                 className="bg-white rounded-3xl border border-[#D8E7E5] shadow-[0_4px_24px_rgba(13,72,70,0.04)] p-6 hover:shadow-[0_12px_36px_rgba(13,72,70,0.08)] hover:-translate-y-0.5 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-6"
               >
                 <div className="flex items-start gap-4 text-left font-sans">
-                  <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center shrink-0">
+                  <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center shrink-0">
                     <FileText size={22} />
                   </div>
                   <div>
                     <h4 className="font-heading font-bold text-base text-text-primary">
-                      {bill.razorpay_order_id || `INV-2025-${bill.id.slice(0,4).toUpperCase()}`}
+                      {bill.appointment?.doctor?.name
+                        ? `Consultation — ${bill.appointment.doctor.name}`
+                        : bill.doctorName 
+                        ? `Consultation — ${bill.doctorName}`
+                        : `INV-${bill.id.slice(0, 8).toUpperCase()}`}
                     </h4>
-                    <p className="text-xs text-text-secondary mt-0.5 font-medium">MedSpaces Multi Speciality Hospital</p>
-                    <div className="flex flex-wrap gap-x-6 mt-3 text-xs text-text-secondary">
-                      <span>Date: <span className="font-semibold text-text-primary">{new Date(bill.created_at).toLocaleDateString()}</span></span>
-                      {bill.payment_mode && <span>Method: <span className="font-semibold text-text-primary">{bill.payment_mode}</span></span>}
+                    <p className="text-xs text-[#527774] mt-0.5 font-semibold">
+                      Invoice: INV-{bill.id.slice(0, 8).toUpperCase()}
+                    </p>
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 mt-3 text-xs text-text-secondary">
+                      <span>
+                        Date:{' '}
+                        <span className="font-semibold text-text-primary">
+                          {bill.appointment?.appointment_date || new Date(bill.created_at).toLocaleDateString()}
+                        </span>
+                      </span>
+                      {bill.appointment?.start_time && (
+                        <span>
+                          Time:{' '}
+                          <span className="font-semibold text-text-primary">
+                            {bill.appointment.start_time.slice(0, 5)}
+                          </span>
+                        </span>
+                      )}
+                      {bill.payment_mode && (
+                        <span>
+                          Method: <span className="font-semibold text-text-primary uppercase">{bill.payment_mode}</span>
+                        </span>
+                      )}
                     </div>
+                    {(bill.payment_status === 'CASH_PAYMENT_PENDING' || bill.payment_status === 'CASH_PENDING') && (
+                      <p className="text-xs text-indigo-600 font-semibold mt-2">
+                        Cash payment selected. Please pay at the clinic front office at least 30 minutes before your appointment.
+                      </p>
+                    )}
+                    {bill.payment_status === 'PAYMENT_EXPIRED' && (
+                      <p className="text-xs text-red-600 font-semibold mt-2">
+                        Payment window closed. This invoice has expired.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -337,13 +422,16 @@ const MyBills = () => {
                   <p className="text-lg font-bold font-heading text-text-primary">
                     ₹{parseFloat(bill.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
-                  
+
                   {getStatusBadge(bill)}
 
-                  {bill.collected_flag !== 'Yes' && bill.payment_status !== 'Awaiting Cash Payment' && (
-                    <button 
+                  {bill.collected_flag !== 'Yes' && 
+                   bill.payment_status !== 'CASH_PAYMENT_PENDING' && 
+                   bill.payment_status !== 'CASH_PENDING' && 
+                   bill.payment_status !== 'PAYMENT_EXPIRED' && (
+                    <button
                       onClick={() => handlePayNowClick(bill)}
-                      className="text-white font-sans font-semibold text-xs py-2 px-4 rounded-xl hover:-translate-y-0.5 transition-all duration-200"
+                      className="text-white font-sans font-semibold text-xs py-2 px-4 rounded-xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                       style={{ background: 'linear-gradient(135deg, #0D4846, #11615D)' }}
                     >
                       Pay Now
@@ -351,9 +439,9 @@ const MyBills = () => {
                   )}
 
                   {bill.collected_flag === 'Yes' && (
-                    <button 
+                    <button
                       onClick={() => downloadReceipt(bill)}
-                      className="p-2 border border-[#D8E7E5] text-[#0D4846] hover:bg-slate-50 rounded-xl transition-all"
+                      className="p-2 border border-[#D8E7E5] text-[#0D4846] hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
                       title="Download Receipt"
                     >
                       <Download size={16} />
@@ -367,7 +455,8 @@ const MyBills = () => {
             <div className="bg-[#EFF6FF] border border-[#D8E7E5] rounded-2xl p-4 flex items-start gap-3 text-left">
               <Info size={18} className="text-secondary shrink-0 mt-0.5" />
               <p className="font-sans text-xs text-text-secondary leading-relaxed">
-                All payments are securely processed and encrypted. Receipts will be issued instantly upon successful transaction verification.
+                All payments are securely processed and encrypted. Receipts will be issued instantly upon
+                successful transaction verification.
               </p>
             </div>
           </div>
@@ -377,69 +466,89 @@ const MyBills = () => {
               <div className="w-16 h-16 bg-[#F4F8F7] text-primary rounded-full flex items-center justify-center mx-auto shadow-sm">
                 <CreditCard size={32} />
               </div>
-              <div>
-                <h3 className="font-heading font-bold text-lg text-text-primary">No outstanding bills</h3>
-                <p className="font-sans text-xs text-text-secondary mt-1">
-                  You do not have any billing statements registered on your account profile.
-                </p>
-              </div>
+              {activeTab === 'outstanding' ? (
+                <div>
+                  <h3 className="font-heading font-bold text-lg text-text-primary">No outstanding bills</h3>
+                  <p className="font-sans text-xs text-text-secondary mt-1">
+                    You do not have any pending billing statements registered on your account profile.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <h3 className="font-heading font-bold text-lg text-text-primary">No paid invoices</h3>
+                  <p className="font-sans text-xs text-text-secondary mt-1">
+                    You do not have any completed billing transactions on your profile.
+                  </p>
+                </div>
+              )}
             </div>
           </Card>
         )}
       </div>
 
       {/* Payment Selection Modal */}
-      {showMethodModal && (
+      {showMethodModal && selectedBill && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-md rounded-3xl border border-[#D8E7E5] shadow-[0_20px_50px_rgba(13,72,70,0.15)] p-6 relative animate-float-card">
-            <button 
+          <div className="bg-white w-full max-w-md rounded-3xl border border-[#D8E7E5] shadow-[0_20px_50px_rgba(13,72,70,0.15)] p-6 relative animate-float-card animate-duration-300">
+            <button
               onClick={() => setShowMethodModal(false)}
-              className="absolute top-4 right-4 text-text-secondary hover:text-text-primary"
+              className="absolute top-4 right-4 text-text-secondary hover:text-text-primary cursor-pointer"
             >
               <X size={20} />
             </button>
 
-            <h3 className="font-heading font-bold text-lg text-text-primary text-center mb-6">Select Payment Method</h3>
-            
+            <h3 className="font-heading font-bold text-lg text-text-primary text-center mb-6">
+              Choose Payment Method
+            </h3>
+
             <div className="space-y-4">
               {/* UPI Option */}
-              <button 
-                onClick={processUPIPayment}
-                className="w-full flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-[#F0FDFA] hover:border-primary/20 transition-all text-left"
-              >
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-left space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-white border border-[#D8E7E5] rounded-xl text-primary">
                     <Smartphone size={20} />
                   </div>
                   <div>
-                    <h4 className="font-heading font-bold text-sm text-text-primary">UPI Payment</h4>
-                    <p className="font-sans text-[11px] text-text-secondary mt-0.5">Pay securely using any UPI app</p>
+                    <h4 className="font-heading font-bold text-sm text-text-primary">ONLINE PAYMENT</h4>
+                    <p className="font-sans text-[11px] text-text-secondary mt-0.5">
+                      Pay securely using Razorpay (Cards, NetBanking, UPI)
+                    </p>
                   </div>
                 </div>
-                <ChevronRight size={18} className="text-text-secondary" />
-              </button>
+                <button
+                  onClick={processUPIPayment}
+                  className="w-full text-white font-sans font-semibold text-xs py-2.5 rounded-xl transition-all duration-200 text-center cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, #0D4846, #11615D)' }}
+                >
+                  Pay ₹{selectedBill.amount} Online
+                </button>
+              </div>
 
               {/* Cash Option */}
-              <button 
-                onClick={processCashPayment}
-                className="w-full flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-[#F0FDFA] hover:border-primary/20 transition-all text-left"
-              >
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-left space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-white border border-[#D8E7E5] rounded-xl text-primary">
                     <MapPin size={20} />
                   </div>
                   <div>
-                    <h4 className="font-heading font-bold text-sm text-text-primary">Cash Payment</h4>
-                    <p className="font-sans text-[11px] text-text-secondary mt-0.5">Pay at the clinic</p>
+                    <h4 className="font-heading font-bold text-sm text-text-primary">CASH PAYMENT</h4>
+                    <p className="font-sans text-[11px] text-text-secondary mt-0.5">
+                      Please pay at the Front Office at least 30 minutes before your appointment.
+                    </p>
                   </div>
                 </div>
-                <ChevronRight size={18} className="text-text-secondary" />
-              </button>
+                <button
+                  onClick={processCashPayment}
+                  className="w-full bg-white border border-[#D8E7E5] text-[#0D4846] font-sans font-semibold text-xs py-2.5 rounded-xl hover:bg-slate-50 transition-all text-center cursor-pointer"
+                >
+                  Choose Cash Payment
+                </button>
+              </div>
             </div>
 
-            <button 
+            <button
               onClick={() => setShowMethodModal(false)}
-              className="w-full mt-6 py-3 bg-transparent border border-[#D8E7E5] text-text-secondary font-sans font-semibold text-xs rounded-xl hover:bg-slate-50 transition-all"
+              className="w-full mt-6 py-3 bg-transparent border border-[#D8E7E5] text-text-secondary font-sans font-semibold text-xs rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
             >
               Cancel
             </button>
@@ -448,11 +557,7 @@ const MyBills = () => {
       )}
 
       {toastMessage && (
-        <Toast 
-          message={toastMessage} 
-          type={toastType} 
-          onClose={() => setToastMessage(null)} 
-        />
+        <Toast message={toastMessage} type={toastType} onClose={() => setToastMessage(null)} />
       )}
     </NavigationShell>
   );

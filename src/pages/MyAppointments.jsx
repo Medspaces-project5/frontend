@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import NavigationShell from '../components/NavigationShell';
 import Card from '../components/Card';
 import Toast from '../components/Toast';
@@ -8,6 +9,7 @@ import api from '../services/api';
 import { Calendar, ShieldAlert, Clock, Info } from 'lucide-react';
 
 const MyAppointments = () => {
+  const navigate = useNavigate();
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
@@ -123,6 +125,8 @@ const MyAppointments = () => {
           <div className="space-y-4">
             {displayedAppts.map((appt) => {
               const isToday = appt.appointment_date === todayStr;
+              const hasBill = appt.bill || (appt.billing_entries && appt.billing_entries[0]);
+              const bill = appt.bill || (appt.billing_entries && appt.billing_entries[0]);
               return (
                 <div 
                   key={appt.id}
@@ -159,11 +163,40 @@ const MyAppointments = () => {
                         {isToday && appt.token_number && (
                           <span className="font-bold text-[#0D4846]">Token No: A-{appt.token_number}</span>
                         )}
+                        {hasBill && (
+                          <div className="mt-2 space-y-0.5 text-xs text-text-secondary">
+                            <p>Consultation Fee: <span className="font-bold text-text-primary">₹{bill.amount}</span></p>
+                            <p>
+                              Payment Status: {' '}
+                              {bill.payment_status === 'PAID_ONLINE' && (
+                                <span className="font-bold text-emerald-600 uppercase">PAID (ONLINE)</span>
+                              )}
+                              {bill.payment_status === 'PAID_CASH' && (
+                                <span className="font-bold text-emerald-600 uppercase">PAID (CASH)</span>
+                              )}
+                              {bill.payment_status === 'CASH_PENDING' && (
+                                <span className="font-bold text-indigo-600 uppercase">CASH PAYMENT PENDING (CASH)</span>
+                              )}
+                              {bill.payment_status !== 'PAID_ONLINE' && bill.payment_status !== 'PAID_CASH' && bill.payment_status !== 'CASH_PENDING' && (
+                                <span className="font-bold text-amber-600 uppercase">PAYMENT PENDING</span>
+                              )}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between md:justify-end gap-3 font-sans shrink-0">
                     {getStatusBadge(appt.status)}
+                    {hasBill && bill.payment_status !== 'PAID_ONLINE' && bill.payment_status !== 'PAID_CASH' && bill.payment_status !== 'CASH_PENDING' && (
+                      <button
+                        onClick={() => navigate('/patient/bills')}
+                        className="text-white font-sans font-semibold text-xs py-1.5 px-4 rounded-xl hover:-translate-y-0.5 transition-all duration-200"
+                        style={{ background: 'linear-gradient(135deg, #0D4846, #11615D)' }}
+                      >
+                        Pay Now
+                      </button>
+                    )}
                   </div>
                 </div>
               );

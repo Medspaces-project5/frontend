@@ -1,27 +1,10 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Calendar, User, FileText, Settings, Users, LogOut, LayoutDashboard, CreditCard, ShieldAlert } from 'lucide-react';
+import { Calendar, User, LogOut, LayoutDashboard, CreditCard } from 'lucide-react';
 
 const NavigationShell = ({ role, userName, onLogout, children }) => {
-  // Define menu items available for each role (reusable shared components, not hardcoded inside the component body)
+  // Define menu items available for patient role
   const menuConfig = {
-    admin: [
-      { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { path: '/admin/staff', label: 'Manage Staff', icon: Users },
-      { path: '/admin/billing', label: 'Billing Configuration', icon: Settings },
-    ],
-    doctor: [
-      { path: '/doctor/queue', label: 'Today\'s Queue', icon: ShieldAlert },
-      { path: '/doctor/calendar', label: 'Calendar', icon: Calendar },
-      { path: '/doctor/patients', label: 'My Patients', icon: Users },
-      { path: '/doctor/availability', label: 'Availability', icon: Settings },
-    ],
-    frontdesk: [
-      { path: '/frontdesk/queue', label: 'Today\'s Queue', icon: ShieldAlert },
-      { path: '/frontdesk/calendar', label: 'Calendar', icon: Calendar },
-      { path: '/frontdesk/patients', label: 'Patient Registry', icon: Users },
-      { path: '/frontdesk/billing', label: 'Billing Fees', icon: CreditCard },
-    ],
     patient: [
       { path: '/patient/home', label: 'Dashboard', icon: LayoutDashboard },
       { path: '/patient/appointments', label: 'My Appointments', icon: Calendar },
@@ -31,6 +14,7 @@ const NavigationShell = ({ role, userName, onLogout, children }) => {
   };
 
   const menuItems = menuConfig[role] || [];
+
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-app-bg text-text-primary font-sans">
