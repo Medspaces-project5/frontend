@@ -13,6 +13,7 @@ import PatientHome from './pages/PatientHome';
 import MyBills from './pages/MyBills';
 import PatientProfilePatient from './pages/PatientProfilePatient';
 import ComponentShowcase from './pages/ComponentShowcase';
+import RateYourVisit from './pages/RateYourVisit';
 import useAuthStore from './store/authStore';
 import './index.css';
 
@@ -46,6 +47,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/password-reset-success" element={<PasswordResetSuccess />} />
         <Route path="/showcase" element={<ComponentShowcase />} />
+        <Route path="/feedback/:token" element={<RateYourVisit />} />
 
         {/* Guarded Patient Routes */}
         <Route 
