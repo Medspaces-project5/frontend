@@ -37,15 +37,12 @@ const PatientHome = () => {
   useEffect(() => {
     const fetchPortalData = async () => {
       try {
-        const apptsRes = await api.get('/patient/appointments', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const billsRes = await api.get('/patient/bills', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const profileRes = await api.patch('/patient/profile', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const headers = { Authorization: `Bearer ${token}` };
+        const [apptsRes, billsRes, profileRes] = await Promise.all([
+          api.get('/patient/appointments', { headers }),
+          api.get('/patient/bills', { headers }),
+          api.patch('/patient/profile', {}, { headers })
+        ]);
 
         if (apptsRes.success) setAppointments(apptsRes.data || []);
         if (billsRes.success) setBills(billsRes.data || []);
